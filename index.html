@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>高级AI角色群聊</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700&display=swap');
+
+        :root {
+            --primary-color: #5d5dff;
+            --secondary-color: #3f3f5f;
+            --background-color: #1a1a2e;
+            --chat-bg-color: #16162a;
+            --user-bubble-color: #5d5dff;
+            --ai-bubble-color: #3f3f5f;
+            --text-color-light: #e0e0f0;
+            --text-color-dark: #b0b0d0;
+            --border-color: rgba(255, 255, 255, 0.1);
+            --font-family: 'Noto Sans SC', sans-serif;
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        body {
+            font-family: var(--font-family);
+            background: var(--background-color);
+            color: var(--text-color-light);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+
+        body::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(45deg, var(--background-color), #2a2a4c);
+            z-index: -1;
+        }
+
+        .container {
+            width: 95%;
+            height: 95%;
+            max-width: 1200px;
+            max-height: 95vh;
+            background-color: var(--chat-bg-color);
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3),
+                        0 0 0 2px rgba(255, 255, 255, 0.05);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transition: all 0.5s ease-in-out;
+        }
+
+        header {
+            background: rgba(var(--primary-color), 0.2);
+            padding: 20px;
+            text-align: center;
+            font-size: 1.5em;
+            font-weight: bold;
+            color: white;
+            border-bottom: 1px solid var(--border-color);
+            transition: all 0.3s ease;
+        }
+
+        main {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: row;
+        }
+        
+        #config-panel {
+            width: 35%;
+            padding: 20px;
+            border-right: 1px solid var(--border-color);
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            transition: all 0.5s ease;
+            position: relative;
+        }
+
+        #config-panel::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 10px;
+            height: 100%;
+            pointer-events: none;
+            background: linear-gradient(to right, transparent, rgba(0, 0, 0, 0.2));
+        }
+        
+        #chat-panel {
+            width: 65%;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        #chat-window {
+            flex-grow: 1;
+            padding: 20px;
+            overflow-y: auto;
+            -webkit-mask-image: linear-gradient(to top, transparent 0%, black 5%, black 95%, transparent 100%);
+            mask-image: linear-gradient(to top, transparent 0%, black 5%, black 95%, transparent 100%);
+            position: relative;
+        }
+
+        .message-container {
+            display: flex;
+            margin-bottom: 20px;
+            align-items: flex-start;
+            animation: fadeIn 0.5s ease-in-out;
+            transition: all 0.3s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message-container.user {
+            justify-content: flex-end;
+        }
+
+        .message-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            object-fit: cover;
+            margin-right: 12px;
+            flex-shrink: 0;
+            transition: transform 0.3s ease;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+        }
+
+        .message-container.user .message-avatar {
+            order: 2;
+            margin-left: 12px;
+            margin-right: 0;
+        }
+
+        .message-bubble {
+            max-width: 75%;
+            padding: 15px;
+            border-radius: 25px;
+            word-wrap: break-word;
+            line-height: 1.5;
+            position: relative;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            font-size: 0.95em;
+            transition: transform 0.3s ease, background-color 0.3s ease;
+        }
+
+        .message-bubble::before {
+            content: '';
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background: inherit;
+            top: 15px;
+            transform: rotate(45deg);
+        }
+
+        .message-bubble.ai {
+            background-color: var(--ai-bubble-color);
+            color: var(--text-color-light);
+        }
+        .message-bubble.ai::before {
+            left: -5px;
+        }
+
+        .message-bubble.user {
+            background-color: var(--user-bubble-color);
+            color: white;
+        }
+        .message-bubble.user::before {
+            right: -5px;
+        }
+
+        .sender-name {
+            font-weight: bold;
+            display: block;
+            margin-bottom: 8px;
+            color: var(--text-color-dark);
+            font-size: 0.8em;
+        }
+
+        .message-container.user .sender-name {
+            color: white;
+            text-align: right;
+        }
+
+        #chat-input-area {
+            display: flex;
+            padding: 15px;
+            background-color: var(--chat-bg-color);
+            border-top: 1px solid var(--border-color);
+        }
+
+        #message-input {
+            flex-grow: 1;
+            padding: 12px 20px;
+            border: 1px solid var(--border-color);
+            background-color: #2b2b40;
+            color: var(--text-color-light);
+            border-radius: 25px;
+            margin-right: 15px;
+            font-size: 1em;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+        #message-input:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(var(--primary-color), 0.3);
+        }
+
+        #send-btn {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            padding: 12px 25px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        #send-btn:hover {
+            background-color: #6a6aff;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.3);
+        }
+        #send-btn:active {
+            transform: translateY(0);
+        }
+        
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 8px; font-weight: bold; font-size: 0.9em; color: var(--text-color-dark); }
+        .form-group input[type="text"],
+        .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            box-sizing: border-box;
+            font-size: 0.9em;
+            background-color: #2b2b40;
+            color: var(--text-color-light);
+            transition: all 0.3s ease;
+        }
+        .form-group input[type="text"]:focus,
+        .form-group textarea:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 2px rgba(var(--primary-color), 0.2);
+        }
+        
+        #roles-container .role-card {
+            background-color: #222238;
+            border: 1px solid var(--border-color);
+            padding: 15px;
+            border-radius: 12px;
+            margin-bottom: 15px;
+            position: relative;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+        }
+        .role-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+        .role-card button.remove-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 28px;
+            height: 28px;
+            cursor: pointer;
+            font-weight: bold;
+            line-height: 1;
+            font-size: 1.1em;
+            transition: all 0.3s ease;
+            opacity: 0;
+        }
+        .role-card:hover button.remove-btn {
+            opacity: 1;
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 15px;
+            margin-top: auto;
+            padding-top: 20px;
+        }
+        .action-buttons button {
+            flex: 1;
+            padding: 15px;
+            border-radius: 12px;
+            border: none;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        #add-role-btn {
+            background-color: var(--secondary-color);
+            color: white;
+        }
+        #add-role-btn:hover {
+            background-color: #5d5d85;
+        }
+        #submit-roles-btn {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        #submit-roles-btn:disabled {
+            background-color: #3f3f5f;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+        #submit-roles-btn:disabled:hover {
+            transform: none;
+        }
+        
+        .loading-animation {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+            -webkit-animation: spin 1s ease-in-out infinite;
+            margin-left: 10px;
+        }
+        @keyframes spin {
+            to { -webkit-transform: rotate(360deg); }
+        }
+        @-webkit-keyframes spin {
+            to { -webkit-transform: rotate(360deg); }
+        }
+
+        /* 移动端适配 */
+        @media (max-width: 768px) {
+            .container {
+                width: 100%;
+                height: 100%;
+                max-height: 100vh;
+                border-radius: 0;
+            }
+            main {
+                flex-direction: column;
+            }
+            #config-panel {
+                width: 100%;
+                height: 40vh;
+                max-height: 50vh;
+                border-right: none;
+                border-bottom: 1px solid var(--border-color);
+                transition: transform 0.5s ease;
+                transform: translateY(0);
+            }
+            #chat-panel {
+                width: 100%;
+                height: 60vh;
+                flex-grow: 1;
+            }
+            .message-bubble {
+                max-width: 85%;
+            }
+            #config-panel.minimized {
+                height: 60px;
+                overflow: hidden;
+            }
+            #config-panel.minimized .action-buttons,
+            #config-panel.minimized #roles-container,
+            #config-panel.minimized #user-info {
+                display: none;
+            }
+            #config-panel h3 {
+                display: block;
+                cursor: pointer;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <header>AI 角色群聊</header>
+
+        <main>
+            <div id="config-panel">
+                <h3 id="config-toggle">角色设定 <span id="loading-spinner" style="display:none;" class="loading-animation"></span></h3>
+                <div class="form-group" id="user-info">
+                    <label for="user-name">你的名字</label>
+                    <input type="text" id="user-name" placeholder="你的名字" value="用户">
+                </div>
+
+                <div id="roles-container">
+                    <div class="role-card">
+                        <label>角色 1</label>
+                        <input type="text" class="role-name" placeholder="角色名称，如 '爱因斯坦'">
+                        <textarea class="role-prompt" placeholder="AI将扮演这个角色，例如：你现在是阿尔伯特·爱因斯坦，一个物理学家..." rows="3"></textarea>
+                        <button class="remove-btn">x</button>
+                    </div>
+                </div>
+                
+                <div class="action-buttons">
+                    <button id="add-role-btn">添加角色</button>
+                    <button id="submit-roles-btn">开始群聊</button>
+                </div>
+            </div>
+
+            <div id="chat-panel">
+                <div id="chat-window"></div>
+                <div id="chat-input-area">
+                    <input type="text" id="message-input" placeholder="输入你的消息...">
+                    <button id="send-btn">发送</button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script type="module">
+        import { CreateWebWorkerMLCEngine } from 'https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm@latest/dist/web-llm.js';
+
+        const chatWindow = document.getElementById('chat-window');
+        const messageInput = document.getElementById('message-input');
+        const sendBtn = document.getElementById('send-btn');
+        const userNameInput = document.getElementById('user-name');
+        const rolesContainer = document.getElementById('roles-container');
+        const submitRolesBtn = document.getElementById('submit-roles-btn');
+        const addRoleBtn = document.getElementById('add-role-btn');
+        const configPanel = document.getElementById('config-panel');
+        const configToggle = document.getElementById('config-toggle');
+        const loadingSpinner = document.getElementById('loading-spinner');
+
+        let engine;
+        let aiRoles = [];
+        let chatHistory = [];
+        let isAITurn = false;
+        let aiInterval;
+        let isEngineReady = false;
+
+        async function initEngine() {
+            if (isEngineReady) return;
+            appendMessage('系统', '正在初始化AI引擎，这可能需要几分钟时间...', 'system');
+            loadingSpinner.style.display = 'inline-block';
+            try {
+                engine = await CreateWebWorkerMLCEngine(
+                    new Worker('worker.js', { type: 'module' }), 
+                    'Llama-3-8B-Instruct-q4f32_1'
+                );
+                isEngineReady = true;
+                appendMessage('系统', 'AI引擎初始化成功，可以开始自动填充角色信息了。', 'system');
+            } catch (e) {
+                console.error('AI引擎初始化失败:', e);
+                appendMessage('系统', 'AI引擎初始化失败，请检查浏览器是否支持WebGPU。', 'system');
+            } finally {
+                loadingSpinner.style.display = 'none';
+            }
+        }
+        
+        // 首次加载页面时，立即初始化AI引擎
+        initEngine();
+
+        async function getRolePromptFromAI(roleName) {
+            if (!isEngineReady) {
+                appendMessage('系统', 'AI引擎尚未准备好，请稍候...', 'system');
+                return '';
+            }
+
+            // 清空 chatHistory，避免旧的对话影响角色生成
+            const messages = [
+                { role: 'system', content: '你是一位信息分析专家，请根据你对历史人物、虚构角色或公众人物的了解，用简短的语言总结其核心特征，并将其转化为一个AI角色扮演指令。' },
+                { role: 'user', content: `请为"${roleName}"生成一个角色扮演指令。指令的格式为：“你现在是${roleName}，请以这个角色的身份，根据上下文进行回复。你的语言风格应该符合其特点，如...”。请简要说明该角色的核心性格、语言风格或代表性观点。` }
+            ];
+
+            appendMessage('系统', `正在为 "${roleName}" 自动生成角色扮演指令...`, 'system');
+            
+            try {
+                const output = await engine.chat.completions.create({
+                    messages: messages,
+                    stream: false,
+                    max_tokens: 200
+                });
+
+                const generatedPrompt = output.choices[0].message.content;
+                appendMessage('系统', `角色指令生成成功！`, 'system');
+                return generatedPrompt;
+
+            } catch (e) {
+                console.error('AI生成角色指令失败:', e);
+                appendMessage('系统', `自动生成失败，请手动输入角色指令。`, 'system');
+                return '';
+            }
+        }
+
+        async function addRoleCard(name = '', prompt = '') {
+            const roleCount = rolesContainer.children.length + 1;
+            const newRoleCard = document.createElement('div');
+            newRoleCard.className = 'role-card';
+            newRoleCard.innerHTML = `
+                <label>角色 ${roleCount}</label>
+                <input type="text" class="role-name" placeholder="角色名称，如 '爱因斯坦'" value="${name}">
+                <textarea class="role-prompt" placeholder="AI将扮演这个角色..." rows="3">${prompt}</textarea>
+                <button class="remove-btn">x</button>
+            `;
+            rolesContainer.appendChild(newRoleCard);
+
+            const removeBtn = newRoleCard.querySelector('.remove-btn');
+            removeBtn.addEventListener('click', () => {
+                newRoleCard.remove();
+            });
+
+            const roleNameInput = newRoleCard.querySelector('.role-name');
+            roleNameInput.addEventListener('change', async (e) => {
+                const name = e.target.value;
+                if (name) {
+                    const generatedPrompt = await getRolePromptFromAI(name);
+                    newRoleCard.querySelector('.role-prompt').value = generatedPrompt;
+                }
+            });
+        }
+        
+        addRoleBtn.addEventListener('click', () => addRoleCard());
+        addRoleCard();
+
+        if (window.innerWidth <= 768) {
+            configPanel.classList.add('minimized');
+            configToggle.addEventListener('click', () => {
+                configPanel.classList.toggle('minimized');
+            });
+        }
+
+        submitRolesBtn.addEventListener('click', async () => {
+            if (!isEngineReady) {
+                appendMessage('系统', 'AI引擎尚未准备好，请稍候...', 'system');
+                return;
+            }
+            
+            const roleCards = rolesContainer.querySelectorAll('.role-card');
+            aiRoles = [];
+            for (const card of roleCards) {
+                const name = card.querySelector('.role-name').value;
+                const prompt = card.querySelector('.role-prompt').value;
+                if (name && prompt) {
+                    aiRoles.push({ name, prompt, avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random&color=fff&size=128` });
+                }
+            }
+
+            if (aiRoles.length === 0) {
+                alert('请至少添加一个AI角色！');
+                return;
+            }
+            
+            appendMessage('系统', '群聊已开始！', 'system');
+            submitRolesBtn.style.display = 'none';
+            addRoleBtn.style.display = 'none';
+            
+            if (window.innerWidth <= 768) {
+                configPanel.classList.add('minimized');
+            }
+            
+            startAITurnInterval();
+        });
+
+        sendBtn.addEventListener('click', () => {
+            const message = messageInput.value;
+            const userName = userNameInput.value || '用户';
+            if (message && !isAITurn) {
+                appendMessage(userName, message, 'user');
+                chatHistory.push({ role: 'user', content: `${userName}: ${message}` });
+                messageInput.value = '';
+                triggerAITurn();
+            }
+        });
+
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendBtn.click();
+            }
+        });
+
+        function appendMessage(sender, text, type) {
+            const messageContainer = document.createElement('div');
+            messageContainer.className = 'message-container';
+            if (type === 'user' || type === 'system') {
+                messageContainer.classList.add('user');
+            }
+
+            const avatar = document.createElement('img');
+            avatar.className = 'message-avatar';
+            if (type === 'user') {
+                avatar.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(sender)}&background=5d5dff&color=fff&size=128`;
+            } else if (type === 'system') {
+                avatar.src = `https://ui-avatars.com/api/?name=System&background=3f3f5f&color=fff&size=128`;
+            } else {
+                const aiRole = aiRoles.find(role => role.name === sender);
+                avatar.src = aiRole ? aiRole.avatar : `https://ui-avatars.com/api/?name=${encodeURIComponent(sender)}&background=3f3f5f&color=fff&size=128`;
+            }
+            
+            const bubble = document.createElement('div');
+            bubble.className = (type === 'user') ? 'message-bubble user' : 'message-bubble ai';
+            
+            const senderName = document.createElement('span');
+            senderName.className = 'sender-name';
+            senderName.textContent = sender;
+
+            const messageText = document.createElement('span');
+            messageText.textContent = text;
+            
+            bubble.appendChild(senderName);
+            bubble.appendChild(messageText);
+
+            messageContainer.appendChild(avatar);
+            messageContainer.appendChild(bubble);
+            
+            chatWindow.appendChild(messageContainer);
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+        }
+
+        async function triggerAITurn() {
+            if (isAITurn) return;
+            
+            isAITurn = true;
+            
+            const randomIndex = Math.floor(Math.random() * aiRoles.length);
+            const role = aiRoles[randomIndex];
+
+            const messages = [{ role: 'system', content: role.prompt }]
+                            .concat(chatHistory.slice(-5))
+                            .concat([{ role: 'user', content: `现在轮到你了，${role.name}。请根据之前的对话，以你的角色身份进行简短回复。` }]);
+            
+            appendMessage('系统', `正在等待 ${role.name} 回复...`, 'system');
+            
+            try {
+                const output = await engine.chat.completions.create({
+                    messages: messages,
+                    stream: false,
+                    max_tokens: 150
+                });
+
+                let fullMessage = output.choices[0].message.content;
+                
+                if (fullMessage) {
+                    appendMessage(role.name, fullMessage, 'ai');
+                    chatHistory.push({ role: 'assistant', content: `${role.name}: ${fullMessage}` });
+                }
+            } catch (e) {
+                console.error('AI生成失败:', e);
+                appendMessage('系统', `${role.name} 回复失败，请重试。`, 'system');
+            }
+            
+            isAITurn = false;
+        }
+
+        function startAITurnInterval() {
+            aiInterval = setInterval(async () => {
+                if (chatHistory.length === 0 || isAITurn) return;
+                
+                const randomIndex = Math.floor(Math.random() * aiRoles.length);
+                const role = aiRoles[randomIndex];
+
+                const messages = [{ role: 'system', content: role.prompt }]
+                                .concat(chatHistory.slice(-5))
+                                .concat([{ role: 'user', content: `现在轮到你了，${role.name}。请以你的角色身份，根据之前的对话，主动参与聊天。` }]);
+                
+                isAITurn = true;
+                
+                try {
+                    const output = await engine.chat.completions.create({
+                        messages: messages,
+                        stream: false,
+                        max_tokens: 150
+                    });
+
+                    let fullMessage = output.choices[0].message.content;
+                    
+                    if (fullMessage) {
+                        appendMessage(role.name, fullMessage, 'ai');
+                        chatHistory.push({ role: 'assistant', content: `${role.name}: ${fullMessage}` });
+                    }
+                } catch (e) {
+                    console.error('AI生成失败:', e);
+                } finally {
+                    isAITurn = false;
+                }
+            }, 10000);
+        }
+    </script>
+</body>
+</html>
